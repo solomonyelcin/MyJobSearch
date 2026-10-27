@@ -1,5 +1,5 @@
 import type { Job, SearchFilters } from '../types'
-import { searchIndeed } from './indeedScraper'
+import { searchIndeed } from '../scrapers/indeedScraper'
 
 export async function searchJobs(filters: SearchFilters): Promise<Job[]> {
   // Fetch from multiple sources and deduplicate

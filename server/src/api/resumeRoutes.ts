@@ -1,20 +1,16 @@
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
-import { promises as fs } from 'fs'
+import { promises as fs, mkdirSync } from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
-import { parseResume, extractSections } from '../parsers/resumeParser'
+import { parseResume } from '../parsers/resumeParser'
 import { extractProfile } from '../skills/skillExtractor'
 import type { Profile, ApiResponse } from '../types'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
 const MAX_FILE_SIZE = parseInt(process.env.MAX_RESUME_SIZE || '5242880')
 
-// Ensure upload directory exists
-await fs.mkdir(UPLOAD_DIR, { recursive: true })
+mkdirSync(UPLOAD_DIR, { recursive: true })
 
 const router = Router()
 

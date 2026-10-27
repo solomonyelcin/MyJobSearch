@@ -1,17 +1,13 @@
-import express, { Express, Request, Response } from 'express'
+import express, { Express, NextFunction, Request, Response } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { join } from 'path'
 import resumeRoutes from './api/resumeRoutes'
 import jobsRoutes from './api/jobsRoutes'
 import matchRoutes from './api/matchRoutes'
 import analyticsRoutes from './api/analyticsRoutes'
 
 dotenv.config()
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
 
 const app: Express = express()
 const PORT = process.env.PORT || 3000
@@ -39,26 +35,7 @@ app.use('/api/jobs', jobsRoutes)
 app.use('/api/match', matchRoutes)
 app.use('/api/analytics', analyticsRoutes)
 
-// Profile management endpoint
-app.get('/api/profile/:profileId', (req: Request, res: Response) => {
-  // Proxy to resume routes
-  const handler = resumeRoutes.stack.find((layer: any) => layer.route?.path === '/:profileId' && layer.route?.methods.get)
-  if (handler) {
-    handler.handle(req, res)
-  } else {
-    res.status(404).json({ success: false, error: 'Profile not found' })
-  }
-})
-
-app.put('/api/profile/:profileId', (req: Request, res: Response) => {
-  // Proxy to resume routes
-  const handler = resumeRoutes.stack.find((layer: any) => layer.route?.path === '/:profileId' && layer.route?.methods.put)
-  if (handler) {
-    handler.handle(req, res)
-  } else {
-    res.status(404).json({ success: false, error: 'Failed to update profile' })
-  }
-})
+app.use('/api/profile', resumeRoutes)
 
 // Serve frontend index.html for all other routes (SPA support)
 app.get('*', (req: Request, res: Response) => {
@@ -70,7 +47,7 @@ app.get('*', (req: Request, res: Response) => {
 })
 
 // Error handling middleware
-app.use((err: any, req: Request, res: Response) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err)
   res.status(err.status || 500).json({
     success: false,

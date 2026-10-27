@@ -1,14 +1,8 @@
-import { readFileSync } from 'fs'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import skillsListJson from './skillsList.json'
+import { skillRegex } from './skillRegex'
 import type { Profile, Skill, Experience, Education, Certification } from '../types'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const skillsList = JSON.parse(
-  readFileSync(join(__dirname, 'skillsList.json'), 'utf-8')
-) as Record<string, string[]>
+const skillsList = skillsListJson as Record<string, string[]>
 
 const allSkills = [
   ...skillsList.technical,
@@ -33,7 +27,7 @@ function extractSkills(text: string): Skill[] {
   const skillFreq = new Map<string, number>()
 
   for (const skill of allSkills) {
-    const pattern = new RegExp(`\\b${skill}\\b`, 'gi')
+    const pattern = skillRegex(skill)
     const matches = text.match(pattern)
     if (matches) {
       foundSkills.add(skill)

@@ -1,4 +1,5 @@
 import type { Profile, Job } from '../types'
+import { skillRegex } from '../skills/skillRegex'
 
 export interface MatchResult extends Job {
   matchScore: number
@@ -53,7 +54,7 @@ function calculateSkillMatch(userSkills: string[], jobDescription: string): numb
   if (userSkills.length === 0) return 0
 
   const matchedCount = userSkills.filter(skill => {
-    const skillPattern = new RegExp(`\\b${skill}\\b`, 'gi')
+    const skillPattern = skillRegex(skill)
     return skillPattern.test(jobDescription)
   }).length
 
@@ -126,7 +127,7 @@ function calculateKeywordMatch(jobDescription: string): number {
 function findMatchedSkills(userSkills: string[], jobDescription: string): string[] {
   return userSkills
     .filter(skill => {
-      const skillPattern = new RegExp(`\\b${skill}\\b`, 'gi')
+      const skillPattern = skillRegex(skill)
       return skillPattern.test(jobDescription)
     })
     .map(skill => skill.charAt(0).toUpperCase() + skill.slice(1))

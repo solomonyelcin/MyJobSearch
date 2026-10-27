@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios'
 import type { Profile, Job, SearchFilters, ApiResponse } from '../types'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 class JobSearchClient {
   private client: AxiosInstance
@@ -52,7 +52,7 @@ class JobSearchClient {
 
   async updateProfile(profile: Profile): Promise<Profile> {
     const response = await this.client.put<ApiResponse<Profile>>(
-      '/profile',
+      `/profile/${profile.id}`,
       profile
     )
 

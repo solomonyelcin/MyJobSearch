@@ -18,21 +18,16 @@ RUN npm run build
 FROM node:18-alpine
 WORKDIR /app
 
-# Install production dependencies
-COPY package*.json ./
-RUN npm install --legacy-peer-deps --only=production
+ENV NODE_ENV=production
 
-# Copy built client
+# Install server production dependencies
+COPY server/package*.json ./
+RUN npm install --legacy-peer-deps --omit=dev
+
+# Copy built server and client
+COPY --from=server-builder /app/server/dist ./dist
 COPY --from=client-builder /app/client/dist ./public
 
-# Copy built server
-COPY --from=server-builder /app/server/dist ./server
-
-# Copy server package.json for runtime
-COPY server/package*.json ./server/
-
-# Expose port
 EXPOSE 3000
 
-# Start server
-CMD ["node", "server/index.js"]
+CMD ["node", "dist/index.js"]
