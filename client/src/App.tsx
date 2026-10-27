@@ -117,7 +117,6 @@ export default function App() {
         {view === 'results' && profile && (
           <JobResults
             jobs={jobs}
-            profile={profile}
             savedJobs={savedJobs}
             onToggleSave={toggleSaveJob}
           />
@@ -128,7 +127,6 @@ export default function App() {
         {view === 'saved' && profile && (
           <JobResults
             jobs={savedJobs}
-            profile={profile}
             savedJobs={savedJobs}
             onToggleSave={toggleSaveJob}
           />
