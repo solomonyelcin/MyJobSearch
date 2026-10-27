@@ -12,6 +12,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
 
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
