@@ -13,7 +13,7 @@ const getScoreColor = (score: number): string => {
   return 'text-danger-500'
 }
 
-export default function JobResults({ jobs, profile, savedJobs, onToggleSave }: JobResultsProps) {
+export default function JobResults({ jobs, savedJobs, onToggleSave }: JobResultsProps) {
   const isSaved = (jobId: string) => savedJobs.some(j => j.id === jobId)
 
   if (jobs.length === 0) {
