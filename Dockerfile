@@ -2,7 +2,7 @@
 FROM node:18-alpine AS client-builder
 WORKDIR /app/client
 COPY client/package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 COPY client .
 RUN npm run build
 
@@ -10,7 +10,7 @@ RUN npm run build
 FROM node:18-alpine AS server-builder
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 COPY server .
 RUN npm run build
 
@@ -20,7 +20,7 @@ WORKDIR /app
 
 # Install production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --legacy-peer-deps --only=production
 
 # Copy built client
 COPY --from=client-builder /app/client/dist ./public
