@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { apiClient } from '../api/client'
 import { Edit2, Save, X } from 'lucide-react'
-import type { Profile, Skill, Experience, Education } from '../types'
+import type { Profile } from '../types'
 
 interface ProfileDisplayProps {
   profile: Profile

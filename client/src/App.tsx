@@ -125,7 +125,7 @@ export default function App() {
         {view === 'dashboard' && profile && (
           <Dashboard jobs={jobs} profile={profile} />
         )}
-        {view === 'saved' && (
+        {view === 'saved' && profile && (
           <JobResults
             jobs={savedJobs}
             profile={profile}

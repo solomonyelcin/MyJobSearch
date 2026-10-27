@@ -1,9 +1,8 @@
 import { Bookmark, BookmarkCheck, ExternalLink } from 'lucide-react'
-import type { Job, Profile } from '../types'
+import type { Job } from '../types'
 
 interface JobResultsProps {
   jobs: Job[]
-  profile: Profile
   savedJobs: Job[]
   onToggleSave: (job: Job) => void
 }
@@ -12,12 +11,6 @@ const getScoreColor = (score: number): string => {
   if (score >= 80) return 'text-success-500'
   if (score >= 50) return 'text-warning-500'
   return 'text-danger-500'
-}
-
-const getScoreBgColor = (score: number): string => {
-  if (score >= 80) return 'bg-success-50 border-success-200'
-  if (score >= 50) return 'bg-warning-50 border-warning-200'
-  return 'bg-danger-50 border-danger-200'
 }
 
 export default function JobResults({ jobs, profile, savedJobs, onToggleSave }: JobResultsProps) {
