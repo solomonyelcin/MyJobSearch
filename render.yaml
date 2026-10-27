@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: job-search-app
+    runtime: docker
+    dockerfile: ./Dockerfile
+    region: oregon
+    plan: free
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: CORS_ORIGIN
+        value: '*'
+
+    buildCommand: npm run install-all && npm run build
+    startCommand: npm start
+
+    healthCheckPath: /health
+
+    routes:
+      - path: /api
+        rewrite: /api
+      - path: /
+        rewrite: /index.html
+
+    autoDeploy: true
