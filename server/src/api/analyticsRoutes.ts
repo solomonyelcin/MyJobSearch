@@ -96,7 +96,7 @@ router.post('/summary', (req: Request, res: Response) => {
       mediumMatchCount: mediumMatchJobs,
       lowMatchCount: lowMatchJobs,
       userSkillsCount: profile.skills.length,
-      userExperienceYears: profile.experience.reduce((sum, exp) => sum + exp.years, 0),
+      userExperienceYears: profile.totalYears ?? profile.experience.reduce((sum, exp) => sum + exp.years, 0),
     }
 
     res.json({ success: true, data: summary } as ApiResponse<typeof summary>)

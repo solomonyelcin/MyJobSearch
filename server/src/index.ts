@@ -14,12 +14,12 @@ const PORT = process.env.PORT || 3000
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
+  origin: process.env.CORS_ORIGIN === '*' ? true : process.env.CORS_ORIGIN || 'http://localhost:5173',
 }))
 
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ limit: '50mb', extended: true }))
+app.set('trust proxy', 1)
+app.use(express.json({ limit: '2mb' }))
+app.use(express.urlencoded({ limit: '2mb', extended: true }))
 
 // Serve static files (frontend)
 app.use(express.static(join(__dirname, '../public')))

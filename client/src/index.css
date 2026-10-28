@@ -3,56 +3,51 @@
 @tailwind utilities;
 
 @layer base {
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-50 text-slate-900 antialiased font-sans;
+    background-image:
+      radial-gradient(60rem 30rem at 85% -10%, rgba(99, 102, 241, .13), transparent 60%),
+      radial-gradient(50rem 28rem at -10% 10%, rgba(139, 92, 246, .10), transparent 60%);
+    background-attachment: fixed;
   }
-
-  h1 {
-    @apply text-3xl font-bold;
-  }
-
-  h2 {
-    @apply text-2xl font-semibold;
-  }
-
-  h3 {
-    @apply text-xl font-semibold;
-  }
+  h1 { @apply text-3xl sm:text-4xl font-bold tracking-tight; }
+  h2 { @apply text-xl sm:text-2xl font-semibold tracking-tight; }
+  h3 { @apply text-base sm:text-lg font-semibold; }
+  :focus-visible { @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-white rounded-md; }
+  button:not(:disabled), label[for] { cursor: pointer; }
 }
 
 @layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium;
-  }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100; }
+  .btn-primary { @apply btn bg-gradient-to-r from-primary-600 to-violet-600 text-white shadow-sm hover:shadow-lift hover:brightness-110; }
+  .btn-secondary { @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300; }
+  .btn-ghost { @apply btn text-slate-600 hover:bg-slate-100; }
+  .btn-success { @apply btn bg-success-600 text-white hover:bg-success-700; }
+  .btn-danger { @apply btn bg-danger-600 text-white hover:bg-danger-700; }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
 
-  .btn-secondary {
-    @apply px-4 py-2 bg-slate-200 text-slate-900 rounded-lg hover:bg-slate-300 transition font-medium;
-  }
+  .card { @apply bg-white/90 backdrop-blur rounded-2xl border border-slate-200/70 shadow-soft p-4 sm:p-6; }
+  .card-hover { @apply transition duration-200 hover:shadow-lift hover:-translate-y-0.5 hover:border-primary-200; }
 
-  .btn-success {
-    @apply px-4 py-2 bg-success-500 text-white rounded-lg hover:bg-success-600 transition font-medium;
-  }
+  .input-base { @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-100 disabled:bg-slate-50 disabled:text-slate-400; }
+  .label { @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5; }
 
-  .btn-danger {
-    @apply px-4 py-2 bg-danger-500 text-white rounded-lg hover:bg-danger-600 transition font-medium;
-  }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700; }
+  .chip-primary { @apply chip bg-primary-50 text-primary-700 ring-1 ring-primary-100; }
+  .chip-success { @apply chip bg-success-50 text-success-700 ring-1 ring-success-100; }
+  .chip-warning { @apply chip bg-warning-50 text-warning-700 ring-1 ring-warning-100; }
 
-  .card {
-    @apply bg-white rounded-lg shadow hover:shadow-lg transition p-6;
-  }
-
-  .input-base {
-    @apply w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500;
-  }
+  .skeleton { @apply rounded-lg bg-[length:200%_100%] bg-gradient-to-r from-slate-100 via-slate-200/70 to-slate-100 animate-shimmer; }
+  .gradient-text { @apply bg-gradient-to-r from-primary-600 to-violet-600 bg-clip-text text-transparent; }
 }
 
-/* Animations */
-@keyframes spin-slow {
-  to {
-    transform: rotate(360deg);
-  }
+@layer utilities {
+  .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), .5rem); }
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
 }
 
-.animate-spin-slow {
-  animation: spin-slow 3s linear infinite;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

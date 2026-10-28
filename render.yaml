@@ -13,6 +13,18 @@ services:
         value: 3000
       - key: CORS_ORIGIN
         value: '*'
+      # AI features (resume extraction, web job search, ranking, application kit). Set in the Render dashboard.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-5
+      # Optional: on-site job listings by country (free key from developer.adzuna.com)
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false
+      - key: ADZUNA_COUNTRY
+        value: in
 
     buildCommand: npm run install-all && npm run build
     startCommand: npm start
