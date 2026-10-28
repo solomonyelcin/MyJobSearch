@@ -119,6 +119,15 @@ export interface SourceReport {
   error?: string
 }
 
+export interface CompanyStatus {
+  name: string
+  ats: string
+  ok: boolean
+  total: number
+  inLocation: number
+  error?: string
+}
+
 export interface DiscoverResult {
   jobs: Job[]
   meta: {
@@ -130,6 +139,7 @@ export interface DiscoverResult {
     includeRemote: boolean
     /** human-readable hints, e.g. a job source that is not configured */
     notices: string[]
+    companies?: CompanyStatus[]
   }
 }
 

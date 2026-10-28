@@ -78,20 +78,31 @@ async function smartRecruiters(c: CompanyConfig, city: string): Promise<Job[]> {
   })
 }
 
-async function workday(c: CompanyConfig, city: string): Promise<Job[]> {
+async function workday(c: CompanyConfig, city: string, queries: string[]): Promise<Job[]> {
   if (!c.host || !c.site) throw new Error('workday host/site missing')
   const api = `https://${c.host}/wday/cxs/${c.slug}/${c.site}/jobs`
-  const pages = await cached(`wd:${c.slug}:${city}`, TTL, async () => {
-    const out: Array<Record<string, any>> = []
-    for (let offset = 0; offset < 60; offset += 20) {
-      const d = await postJson<{ jobPostings?: Array<Record<string, any>>; total?: number }>(api, { appliedFacets: {}, limit: 20, offset, searchText: city }, 12000)
-      const batch = d.jobPostings || []
-      out.push(...batch)
-      if (batch.length < 20 || offset + 20 >= (d.total ?? 0)) break
-    }
-    return out
-  })
-  return pages.map(j => {
+  const search = (text: string, pages: number) =>
+    cached(`wd:${c.slug}:${text}`, TTL, async () => {
+      const out: Array<Record<string, any>> = []
+      for (let offset = 0; offset < pages * 20; offset += 20) {
+        const d = await postJson<{ jobPostings?: Array<Record<string, any>>; total?: number }>(api, { appliedFacets: {}, limit: 20, offset, searchText: text }, 12000)
+        const batch = d.jobPostings || []
+        out.push(...batch)
+        if (batch.length < 20 || offset + 20 >= (d.total ?? 0)) break
+      }
+      return out
+    })
+
+  // "city" alone finds everything mentioning it; "role + city" digs deeper into the roles that fit the resume.
+  const texts = [{ t: city, pages: 3 }, ...queries.slice(0, 2).map(q => ({ t: `${q} ${city}`, pages: 3 }))]
+  const settled = await Promise.allSettled(texts.map(x => search(x.t, x.pages)))
+  const ok = settled.filter((r): r is PromiseFulfilledResult<Array<Record<string, any>>> => r.status === 'fulfilled')
+  if (ok.length === 0) throw (settled[0] as PromiseRejectedResult).reason
+
+  const byPath = new Map<string, Record<string, any>>()
+  for (const r of ok) for (const j of r.value) byPath.set(s(j.externalPath), j)
+
+  return Array.from(byPath.values()).map(j => {
     const path = s(j.externalPath)
     // A location like "3 Locations" hides the city, so it will not pass the strict location filter. That is deliberate.
     const job = base(c, path.split('_').pop() || path, s(j.title), s(j.locationsText), `https://${c.host}/${c.site}${path}`, '', undefined)
@@ -122,18 +133,20 @@ export async function fetchCompany(c: CompanyConfig, city: string, queries: stri
     case 'greenhouse': return greenhouse(c)
     case 'lever': return lever(c)
     case 'smartrecruiters': return smartRecruiters(c, city)
-    case 'workday': return workday(c, city)
+    case 'workday': return workday(c, city, queries)
     case 'amazon': return amazon(c, city, queries)
     default: throw new Error(`Unknown ATS: ${String(c.ats)}`)
   }
 }
 
 /** Fetch full descriptions for the few best matches, so skill matching has real text to work with. */
-export async function enrichDescriptions(jobs: Job[], limit = 12): Promise<Job[]> {
+export async function enrichDescriptions(jobs: Job[], limit = 40): Promise<Job[]> {
   const targets = jobs.filter(j => j.source === 'company' && !j.description && DETAIL_URLS.has(j.id)).slice(0, limit)
   const filled = new Map<string, string>()
-  await Promise.all(
-    targets.map(async j => {
+  let next = 0
+  const worker = async () => {
+    while (next < targets.length) {
+      const j = targets[next++]
       try {
         const d = await cached(`detail:${j.id}`, TTL, () => getJson<Record<string, any>>(DETAIL_URLS.get(j.id)!, 8000))
         const text = s(d.jobPostingInfo?.jobDescription) || s(d.jobAd?.sections?.jobDescription?.text) || s(d.description)
@@ -141,8 +154,9 @@ export async function enrichDescriptions(jobs: Job[], limit = 12): Promise<Job[]
       } catch {
         /* keep the job without a description */
       }
-    }),
-  )
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(8, targets.length) }, worker))
   return jobs.map(j => {
     const text = filled.get(j.id)
     return text ? { ...j, description: text, requirements: reqLines(text) } : j

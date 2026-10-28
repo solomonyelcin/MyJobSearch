@@ -4,7 +4,11 @@ export const DEFAULT_LOCATION = (process.env.DEFAULT_LOCATION || 'Chennai').trim
 
 /** Old/alternate names so "Chennai" also matches postings that say "Madras". */
 const ALIASES: Record<string, string[]> = {
-  chennai: ['chennai', 'madras'],
+  chennai: [
+    'chennai', 'madras', 'sholinganallur', 'siruseri', 'taramani', 'tharamani', 'guindy', 'perungudi', 'navalur', 'ambattur',
+    'porur', 'velachery', 'thoraipakkam', 'kelambakkam', 'nandambakkam', 'mahindra world city', 'tidel park', 'pallavaram', 'adyar',
+    'anna nagar', 'nungambakkam', 'egmore', 't. nagar', 'manapakkam', 'perumbakkam', 'medavakkam', 'chromepet', 'tambaram', 'oragadam',
+  ],
   bengaluru: ['bengaluru', 'bangalore'],
   bangalore: ['bengaluru', 'bangalore'],
   mumbai: ['mumbai', 'bombay', 'navi mumbai', 'thane'],
