@@ -66,7 +66,7 @@ export interface Profile {
   extractedAt?: string
 }
 
-export type JobSource = 'remotive' | 'arbeitnow' | 'remoteok' | 'jobicy' | 'adzuna' | 'ai-web' | 'other'
+export type JobSource = 'company' | 'remotive' | 'arbeitnow' | 'remoteok' | 'jobicy' | 'adzuna' | 'ai-web' | 'other'
 
 export interface Job {
   id: string
