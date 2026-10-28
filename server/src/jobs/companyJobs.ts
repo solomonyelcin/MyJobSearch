@@ -1,16 +1,7 @@
-import type { Job } from '../types'
+import type { CompanyStatus, Job } from '../types'
 import { allCompanies, type CompanyConfig } from './companies'
 import { fetchCompany } from './sources/ats'
 import { jobInLocation } from './location'
-
-export interface CompanyStatus {
-  name: string
-  ats: string
-  ok: boolean
-  total: number
-  inLocation: number
-  error?: string
-}
 
 async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length)

@@ -1,4 +1,4 @@
-import type { DiscoverResult, Job, Profile, SearchFilters, SourceReport } from '../types'
+import type { CompanyStatus, DiscoverResult, Job, Profile, SearchFilters, SourceReport } from '../types'
 import { fetchAdzuna, fetchArbeitnow, fetchJobicy, fetchRemoteOk, fetchRemotive } from './sources/boards'
 import { calculateMatches } from '../matching/matchCalculator'
 import { aiEnabled } from '../ai/anthropic'
@@ -60,12 +60,13 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
     tasks.push(settle(`Adzuna · ${q}`, () => fetchAdzuna(q, searchFilters), reports))
   }
   // Company career portals (one fetch per company, not per query)
-  let companyStatuses: Array<{ ok: boolean }> = []
+  let companyStatuses: CompanyStatus[] = []
   if (!remoteSearch) {
     tasks.push(
       settle('Company career pages', async () => {
         const { jobs, statuses } = await fetchAllCompanyJobs(location, queries)
         companyStatuses = statuses
+        // report only what is actually in the chosen place, not every role the companies have
         return jobs
       }, reports),
     )
@@ -99,12 +100,12 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
   // Company pages list every role (HR, finance...). Fetch full text for the best few, rescore, then drop clear mismatches.
   if (scored.some(j => j.source === 'company')) {
     try {
-      const enriched = await enrichDescriptions(scored, 12)
+      const enriched = await enrichDescriptions(scored, 40)
       scored = calculateMatches(profile, enriched, { location }).sort((a, b) => b.matchScore - a.matchScore)
     } catch {
       /* keep the un-enriched scores */
     }
-    scored = scored.filter(j => j.source !== 'company' || (j.matchScore || 0) >= 30)
+    scored = scored.filter(j => j.source !== 'company' || (j.matchScore || 0) >= 20)
   }
 
   if (useAI && scored.length) {
@@ -129,10 +130,12 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
     const bad = companyStatuses.filter(c => !c.ok).length
     if (bad > 0) notices.push(`${bad} of ${companyStatuses.length} company career pages could not be reached (see /api/jobs/companies/health).`)
   }
+  const inPlaceCompany = inPlace.filter(j => j.source === 'company').length
+  if (merged.has('Company career pages')) merged.get('Company career pages')!.count = inPlaceCompany
   const sources = Array.from(merged.values()).filter(r => !(r.name === 'Adzuna' && r.count === 0 && !r.error))
 
   return {
     jobs: scored.slice(0, 60),
-    meta: { queries, sources, total: scored.length, durationMs: Date.now() - started, location, includeRemote, notices },
+    meta: { queries, sources, total: scored.length, durationMs: Date.now() - started, location, includeRemote, notices, companies: companyStatuses.length ? companyStatuses : undefined },
   }
 }

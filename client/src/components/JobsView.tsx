@@ -296,6 +296,21 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
               <li key={s.name} className="flex justify-between gap-3"><span>{s.name}</span><span className={s.error ? 'text-danger-600' : 'text-slate-500'}>{s.error ? `unavailable (${s.error})` : `${s.count} found`}</span></li>
             ))}
           </ul>
+          {result.meta.companies && result.meta.companies.length > 0 && (
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <p className="mb-1 font-medium text-slate-700">Company career pages</p>
+              <ul className="space-y-0.5 text-xs">
+                {result.meta.companies.map(c => (
+                  <li key={c.name} className="flex justify-between gap-3">
+                    <span>{c.name}</span>
+                    <span className={c.ok ? (c.inLocation ? 'text-success-700' : 'text-slate-400') : 'text-danger-600'}>
+                      {c.ok ? `${c.inLocation} in ${result.meta.location} (of ${c.total})` : `not reachable: ${c.error || 'error'}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </details>
       )}
     </div>
