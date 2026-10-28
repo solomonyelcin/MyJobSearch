@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, BookmarkCheck, BrainCircuit, Building2, CheckCircle2, ChevronDown, ExternalLink, MapPin, RefreshCw, Search, Send, Wifi } from 'lucide-react'
 import { apiClient } from '../api/client'
+import { loadJson, saveJson } from '../lib/storage'
 import { ScoreRing, Spinner, formatSalary, timeAgo } from './ui'
 import type { DiscoverResult, Job, Profile } from '../types'
 
@@ -16,6 +17,11 @@ interface JobsViewProps {
   title?: string
   jobsOverride?: Job[]
 }
+
+const DEFAULT_LOCATION = 'Chennai'
+const LOCATION_KEY = 'mjs.location'
+const REMOTE_KEY = 'mjs.includeRemote'
+const PLACES = ['Chennai', 'Bengaluru', 'Hyderabad', 'Mumbai', 'Pune', 'Delhi NCR', 'Remote']
 
 const SOURCE_LABEL: Record<string, string> = {
   remotive: 'Remotive', arbeitnow: 'Arbeitnow', remoteok: 'RemoteOK', jobicy: 'Jobicy', adzuna: 'Adzuna', 'ai-web': 'AI web search', other: 'Web',
@@ -106,8 +112,9 @@ function JobCard({ job, saved, applied, onToggleSave, onApply }: { job: Job; sav
 
 export default function JobsView({ profile, result, onResult, savedIds, appliedIds, onToggleSave, onApply, aiAvailable, title, jobsOverride }: JobsViewProps) {
   const [query, setQuery] = useState('')
-  const [location, setLocation] = useState(profile.location || '')
-  const [remoteOnly, setRemoteOnly] = useState(false)
+  // Chennai unless the user picked something else (remembered between visits)
+  const [location, setLocation] = useState(() => loadJson<string>(LOCATION_KEY, DEFAULT_LOCATION) || DEFAULT_LOCATION)
+  const [includeRemote, setIncludeRemote] = useState(() => loadJson<boolean>(REMOTE_KEY, false))
   const [useAI, setUseAI] = useState(aiAvailable)
   const [minScore, setMinScore] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -116,18 +123,22 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
 
   useEffect(() => { setUseAI(aiAvailable) }, [aiAvailable])
 
-  const search = useCallback(async () => {
+  const search = useCallback(async (override?: { location?: string; includeRemote?: boolean }) => {
+    const place = (override?.location ?? location).trim() || DEFAULT_LOCATION
+    const withRemote = override?.includeRemote ?? includeRemote
     setLoading(true)
     setError('')
+    saveJson(LOCATION_KEY, place)
+    saveJson(REMOTE_KEY, withRemote)
     try {
-      const data = await apiClient.discoverJobs({ profile, query: query.trim() || undefined, location: location.trim() || undefined, remote: remoteOnly, useAI })
+      const data = await apiClient.discoverJobs({ profile, query: query.trim() || undefined, location: place, includeRemote: withRemote, useAI })
       onResult(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to find jobs')
     } finally {
       setLoading(false)
     }
-  }, [profile, query, location, remoteOnly, useAI, onResult])
+  }, [profile, query, location, includeRemote, useAI, onResult])
 
   useEffect(() => {
     if (jobsOverride || started.current || result) return
@@ -136,13 +147,18 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
   }, [jobsOverride, result, search])
 
   const all = jobsOverride ?? result?.jobs ?? []
-  const jobs = all.filter(j => (j.matchScore || 0) >= minScore && (!remoteOnly || j.remote))
+  const jobs = all.filter(j => (j.matchScore || 0) >= minScore)
+  const shownPlace = result?.meta.location || location
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 animate-fadeIn">
       <div>
         <h2>{title || 'Your best matches'}</h2>
-        {!jobsOverride && <p className="text-sm text-slate-500">Searched live job boards using your resume, then ranked by fit.</p>}
+        {!jobsOverride && (
+          <p className="text-sm text-slate-500">
+            Jobs in <span className="font-semibold text-slate-700">{shownPlace}</span>{result?.meta.includeRemote ? ' and remote' : ' only'}, matched to your resume.
+          </p>
+        )}
       </div>
 
       {!jobsOverride && (
@@ -154,7 +170,8 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
             </div>
             <div>
               <label className="label" htmlFor="loc">Location</label>
-              <input id="loc" value={location} onChange={e => setLocation(e.target.value)} placeholder="City, or Remote" className="input-base" disabled={loading} />
+              <input id="loc" value={location} onChange={e => setLocation(e.target.value)} placeholder="City, e.g. Chennai" className="input-base" disabled={loading} list="places" autoComplete="off" />
+              <datalist id="places">{PLACES.map(p => <option key={p} value={p} />)}</datalist>
             </div>
             <div className="flex items-end">
               <button type="submit" className="btn-primary w-full sm:w-auto" disabled={loading}>
@@ -162,8 +179,16 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
               </button>
             </div>
           </div>
+          <div className="-mx-1 flex flex-wrap gap-1.5" role="group" aria-label="Quick locations">
+            {PLACES.map(p => (
+              <button key={p} type="button" disabled={loading}
+                onClick={() => { setLocation(p); void search({ location: p }) }}
+                aria-pressed={location.trim().toLowerCase() === p.toLowerCase()}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${location.trim().toLowerCase() === p.toLowerCase() ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:border-primary-300'}`}>{p}</button>
+            ))}
+          </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded accent-primary-600" checked={remoteOnly} onChange={e => setRemoteOnly(e.target.checked)} /> Remote only</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded accent-primary-600" checked={includeRemote} onChange={e => setIncludeRemote(e.target.checked)} /> Also include remote jobs</label>
             <label className={`inline-flex items-center gap-2 ${aiAvailable ? '' : 'opacity-50'}`} title={aiAvailable ? '' : 'Add ANTHROPIC_API_KEY on the server to enable'}>
               <input type="checkbox" className="h-4 w-4 rounded accent-primary-600" checked={useAI && aiAvailable} disabled={!aiAvailable} onChange={e => setUseAI(e.target.checked)} />
               <BrainCircuit size={15} className="text-primary-600" /> AI web search &amp; ranking
@@ -173,6 +198,12 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
       )}
 
       {error && <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">{error}</div>}
+
+      {!jobsOverride && result && result.meta.notices.length > 0 && (
+        <div className="rounded-2xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-700" role="status">
+          <ul className="list-disc space-y-1 pl-5">{result.meta.notices.map(n => <li key={n}>{n}</li>)}</ul>
+        </div>
+      )}
 
       {all.length > 0 && (
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0" role="group" aria-label="Minimum match score">
@@ -194,7 +225,7 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
       )}
 
       {!loading && all.length === 0 && !error && (
-        <div className="card text-center text-slate-500">{jobsOverride ? 'Nothing saved yet. Tap the bookmark on a job to keep it here.' : 'No jobs found. Try a broader role or location, or turn off "Remote only".'}</div>
+        <div className="card text-center text-slate-500">{jobsOverride ? 'Nothing saved yet. Tap the bookmark on a job to keep it here.' : `No jobs found in ${shownPlace}. Try another city above, or tick "Also include remote jobs".`}</div>
       )}
 
       <div className="space-y-4">
@@ -206,7 +237,7 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
       {result && !jobsOverride && (
         <details className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-sm text-slate-600">
           <summary className="cursor-pointer font-medium">How these were found</summary>
-          <p className="mt-2">Searched for: {result.meta.queries.join(', ')} · {result.meta.total} postings in {(result.meta.durationMs / 1000).toFixed(1)}s</p>
+          <p className="mt-2">Searched for: {result.meta.queries.join(', ')} in {result.meta.location} · {result.meta.total} postings in {(result.meta.durationMs / 1000).toFixed(1)}s</p>
           <ul className="mt-2 space-y-1">
             {result.meta.sources.map(s => (
               <li key={s.name} className="flex justify-between gap-3"><span>{s.name}</span><span className={s.error ? 'text-danger-600' : 'text-slate-500'}>{s.error ? `unavailable (${s.error})` : `${s.count} found`}</span></li>

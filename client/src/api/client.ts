@@ -77,7 +77,7 @@ class JobSearchClient {
     return response.data.data || { ai: false, model: null, adzuna: false }
   }
 
-  async discoverJobs(params: { profile: Profile; query?: string; location?: string; remote?: boolean; useAI?: boolean }): Promise<DiscoverResult> {
+  async discoverJobs(params: { profile: Profile; query?: string; location?: string; includeRemote?: boolean; useAI?: boolean }): Promise<DiscoverResult> {
     const response = await this.client.post<ApiResponse<DiscoverResult>>('/jobs/discover', params, { timeout: 120000 })
     if (!response.data.success) throw new Error(response.data.error || 'Failed to find jobs')
     return response.data.data!

@@ -3,15 +3,15 @@ import type { Job, Profile } from '../types'
 import { callClaude, parseJsonLoose } from './anthropic'
 
 const SYSTEM = `You are a job-hunting assistant with live web search. Find CURRENT, real, open job postings for the candidate.
-Rules: only include postings you actually found via search results with a direct URL on a careers page or job board. Never invent a posting or URL.
+Rules: only include postings located in the requested location (and remote roles only if explicitly allowed); only include postings you actually found via search results with a direct URL on a careers page or job board. Never invent a posting or URL.
 Return ONLY JSON: {"jobs":[{"title":string,"company":string,"location":string,"url":string,"summary":string,"salary":string|null,"remote":boolean}]}
 Return at most 8 jobs.`
 
-export async function searchJobsWithAI(profile: Profile, query: string, location: string): Promise<Job[]> {
+export async function searchJobsWithAI(profile: Profile, query: string, location: string, includeRemote: boolean): Promise<Job[]> {
   const skills = profile.skills.slice(0, 12).map(s => s.name).join(', ')
   const reply = await callClaude({
     system: SYSTEM,
-    user: `Candidate: ${profile.headline || query}, ~${profile.totalYears ?? '?'} years experience, skills: ${skills}.\nSearch for: "${query}" roles${location ? ` in or near ${location}` : ''}, plus remote roles that fit. Prefer postings from the last 30 days.`,
+    user: `Candidate: ${profile.headline || query}, ~${profile.totalYears ?? '?'} years experience, skills: ${skills}.\nSearch for: "${query}" roles located in ${location || 'any location'}. ${includeRemote ? 'Remote roles are also acceptable.' : 'Do NOT include remote or other-city roles.'} Prefer postings from the last 30 days.`,
     maxTokens: 4000,
     webSearch: { maxUses: 4 },
     timeoutMs: 90000,

@@ -108,7 +108,8 @@ export interface Job {
 export interface SearchFilters {
   query?: string
   location?: string
-  remote?: boolean
+  /** also keep remote jobs that are not in the chosen location */
+  includeRemote?: boolean
   country?: string
 }
 
@@ -125,6 +126,10 @@ export interface DiscoverResult {
     sources: SourceReport[]
     total: number
     durationMs: number
+    location: string
+    includeRemote: boolean
+    /** human-readable hints, e.g. a job source that is not configured */
+    notices: string[]
   }
 }
 
