@@ -39,24 +39,24 @@ export default function Dashboard({ jobs, profile }: DashboardProps) {
   const highMatchJobs = jobs.filter(j => (j.matchScore || 0) >= 80).length
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6 animate-fadeIn">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="card">
           <div className="text-slate-600 text-sm mb-1">Total Jobs Found</div>
-          <div className="text-3xl font-bold text-primary-600">{jobs.length}</div>
+          <div className="text-2xl sm:text-3xl font-bold text-primary-600">{jobs.length}</div>
         </div>
         <div className="card">
           <div className="text-slate-600 text-sm mb-1">Average Match Score</div>
-          <div className="text-3xl font-bold text-primary-600">{avgScore}%</div>
+          <div className="text-2xl sm:text-3xl font-bold text-primary-600">{avgScore}%</div>
         </div>
         <div className="card">
           <div className="text-slate-600 text-sm mb-1">High Match Jobs</div>
-          <div className="text-3xl font-bold text-success-600">{highMatchJobs}</div>
+          <div className="text-2xl sm:text-3xl font-bold text-success-600">{highMatchJobs}</div>
         </div>
         <div className="card">
           <div className="text-slate-600 text-sm mb-1">Your Skills</div>
-          <div className="text-3xl font-bold text-primary-600">{profile.skills.length}</div>
+          <div className="text-2xl sm:text-3xl font-bold text-primary-600">{profile.skills.length}</div>
         </div>
       </div>
 
@@ -64,13 +64,13 @@ export default function Dashboard({ jobs, profile }: DashboardProps) {
       {scoreDistribution.length > 0 && (
         <div className="card">
           <h3 className="text-lg font-semibold mb-4">Match Score Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={scoreDistribution}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="range" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="count" fill="#0ea5e9" />
+              <Bar dataKey="count" fill="#6366f1" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

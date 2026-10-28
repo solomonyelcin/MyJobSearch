@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import type { Profile, Job, SearchFilters, ApiResponse } from '../types'
+import type { Profile, Job, ApiResponse, ApplicationKit, DiscoverResult } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -13,6 +13,14 @@ class JobSearchClient {
         'Content-Type': 'application/json',
       },
     })
+    this.client.interceptors.response.use(
+      r => r,
+      (err: unknown) => {
+        const e = err as { response?: { data?: { error?: string } }; message?: string; code?: string }
+        const msg = e.response?.data?.error || (e.code === 'ECONNABORTED' ? 'The request took too long. Please try again.' : e.message) || 'Something went wrong'
+        return Promise.reject(new Error(msg))
+      },
+    )
   }
 
   // Resume endpoints
@@ -63,29 +71,21 @@ class JobSearchClient {
     return response.data.data!
   }
 
-  // Job search endpoints
-  async searchJobs(filters: SearchFilters): Promise<Job[]> {
-    const response = await this.client.get<ApiResponse<Job[]>>(
-      '/jobs/search',
-      { params: filters }
-    )
-
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to search jobs')
-    }
-
-    return response.data.data || []
+  // Job discovery & apply
+  async aiStatus(): Promise<{ ai: boolean; model: string | null; adzuna: boolean }> {
+    const response = await this.client.get<ApiResponse<{ ai: boolean; model: string | null; adzuna: boolean }>>('/jobs/ai-status')
+    return response.data.data || { ai: false, model: null, adzuna: false }
   }
 
-  async getJobDetails(jobId: string): Promise<Job> {
-    const response = await this.client.get<ApiResponse<Job>>(
-      `/jobs/${jobId}`
-    )
+  async discoverJobs(params: { profile: Profile; query?: string; location?: string; remote?: boolean; useAI?: boolean }): Promise<DiscoverResult> {
+    const response = await this.client.post<ApiResponse<DiscoverResult>>('/jobs/discover', params, { timeout: 120000 })
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to find jobs')
+    return response.data.data!
+  }
 
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to get job details')
-    }
-
+  async applyKit(profile: Profile, job: Job): Promise<ApplicationKit> {
+    const response = await this.client.post<ApiResponse<ApplicationKit>>('/jobs/apply-kit', { profile, job }, { timeout: 90000 })
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to prepare application')
     return response.data.data!
   }
 
