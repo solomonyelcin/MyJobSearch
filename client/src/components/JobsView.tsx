@@ -224,8 +224,35 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
         </div>
       )}
 
-      {!loading && all.length === 0 && !error && (
-        <div className="card text-center text-slate-500">{jobsOverride ? 'Nothing saved yet. Tap the bookmark on a job to keep it here.' : `No jobs found in ${shownPlace}. Try another city above, or tick "Also include remote jobs".`}</div>
+      {!loading && all.length === 0 && !error && jobsOverride && (
+        <div className="card text-center text-slate-500">Nothing saved yet. Tap the bookmark on a job to keep it here.</div>
+      )}
+
+      {!loading && all.length === 0 && !error && !jobsOverride && (
+        <div className="card space-y-4 text-center">
+          <div>
+            <h3>No jobs found in {shownPlace}</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              The free job boards used here are mostly remote or European, so they rarely list on-site jobs in {shownPlace}.
+            </p>
+          </div>
+          <div className="flex flex-col justify-center gap-2 sm:flex-row">
+            {!includeRemote && (
+              <button className="btn-primary" disabled={loading} onClick={() => { setIncludeRemote(true); void search({ includeRemote: true }) }}>
+                <Wifi size={16} /> Show remote jobs too
+              </button>
+            )}
+            <button className="btn-secondary" disabled={loading} onClick={() => void search()}><RefreshCw size={16} /> Try again</button>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-4 text-left text-sm text-slate-600">
+            <p className="mb-1 font-semibold text-slate-700">To get on-site jobs in Chennai (about 5 minutes, free)</p>
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>Register at <span className="font-medium">developer.adzuna.com</span> and copy your App ID and App Key.</li>
+              <li>In Render, open this service, then Environment, and add <code className="rounded bg-white px-1">ADZUNA_APP_ID</code> and <code className="rounded bg-white px-1">ADZUNA_APP_KEY</code>.</li>
+              <li>Save. Render redeploys, then tap Search again here.</li>
+            </ol>
+          </div>
+        </div>
       )}
 
       <div className="space-y-4">
