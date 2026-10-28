@@ -1,12 +1,13 @@
 import { Router, Request, Response } from 'express'
 import { discoverJobs } from '../jobs/discover'
 import { buildApplicationKit } from '../ai/applicationKit'
+import { buildInterviewPrep } from '../ai/interviewPrep'
 import { aiEnabled, aiModel } from '../ai/anthropic'
 import { aiBudgetPerHour, takeToken } from '../util/rateLimit'
 import { DEFAULT_LOCATION } from '../jobs/location'
 import { fetchAllCompanyJobs } from '../jobs/companyJobs'
 import { cached } from '../util/cache'
-import type { ApiResponse, ApplicationKit, DiscoverResult, Job, Profile } from '../types'
+import type { ApiResponse, ApplicationKit, DiscoverResult, InterviewPrep, Job, Profile } from '../types'
 
 const router = Router()
 
@@ -75,6 +76,20 @@ router.post('/apply-kit', async (req: Request, res: Response) => {
     res.json({ success: true, data: kit } as ApiResponse<ApplicationKit>)
   } catch (err) {
     res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'Failed to build application kit' })
+  }
+})
+
+/** Interview preparation for one job: likely questions with model answers, topics to revise, a 7-day plan. */
+router.post('/prep', async (req: Request, res: Response) => {
+  try {
+    const { profile, job } = req.body as { profile?: Profile; job?: Job }
+    if (!profile || !job) return res.status(400).json({ success: false, error: 'Profile and job are required' })
+    let wantAI = aiEnabled()
+    if (wantAI && !takeToken(`prep:${req.ip}`, aiBudgetPerHour(), 3600_000)) wantAI = false
+    const prep = await buildInterviewPrep(profile, job, wantAI)
+    res.json({ success: true, data: prep } as ApiResponse<InterviewPrep>)
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'Failed to prepare interview guide' })
   }
 })
 

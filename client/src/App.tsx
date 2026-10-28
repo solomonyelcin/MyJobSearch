@@ -19,8 +19,9 @@ export default function App() {
   const [result, setResult] = useState<DiscoverResult | null>(null)
   const [saved, setSaved] = useState<Job[]>(() => loadJson<Job[]>(KEYS.saved, []))
   const [applied, setApplied] = useState<Job[]>(() => loadJson<Job[]>(KEYS.applied, []))
-  const [applyJob, setApplyJob] = useState<Job | null>(null)
-  const [aiAvailable, setAiAvailable] = useState(false)
+  const [apply, setApply] = useState<{ job: Job; tab: 'apply' | 'prep' } | null>(null)
+  // null until the server tells us whether AI is configured, so the first search can already use it
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null)
 
   useEffect(() => {
     apiClient.aiStatus().then(s => setAiAvailable(s.ai)).catch(() => setAiAvailable(false))
@@ -103,10 +104,10 @@ export default function App() {
         {view === 'upload' && <ResumeUpload onProfileExtracted={handleProfileExtracted} />}
         {view === 'profile' && profile && <ProfileDisplay profile={profile} onProfileUpdated={handleProfileUpdated} onFindJobs={() => goto('jobs')} />}
         {view === 'jobs' && profile && (
-          <JobsView profile={profile} result={result} onResult={setResult} savedIds={savedIds} appliedIds={appliedIds} onToggleSave={toggleSave} onApply={setApplyJob} aiAvailable={aiAvailable} />
+          <JobsView profile={profile} result={result} onResult={setResult} savedIds={savedIds} appliedIds={appliedIds} onToggleSave={toggleSave} onApply={(job, tab) => setApply({ job, tab: tab || 'apply' })} aiAvailable={aiAvailable} onEditProfile={() => goto('profile')} />
         )}
         {view === 'saved' && profile && (
-          <JobsView profile={profile} result={result} onResult={setResult} savedIds={savedIds} appliedIds={appliedIds} onToggleSave={toggleSave} onApply={setApplyJob} aiAvailable={aiAvailable} title="Saved jobs" jobsOverride={saved} />
+          <JobsView profile={profile} result={result} onResult={setResult} savedIds={savedIds} appliedIds={appliedIds} onToggleSave={toggleSave} onApply={(job, tab) => setApply({ job, tab: tab || 'apply' })} aiAvailable={aiAvailable} title="Saved jobs" jobsOverride={saved} />
         )}
         {view === 'insights' && profile && (
           <>
@@ -134,8 +135,8 @@ export default function App() {
         </div>
       </nav>
 
-      {applyJob && profile && (
-        <ApplyDrawer job={applyJob} profile={profile} applied={appliedIds.has(applyJob.id)} onMarkApplied={markApplied} onClose={() => setApplyJob(null)} />
+      {apply && profile && (
+        <ApplyDrawer job={apply.job} profile={profile} initialTab={apply.tab} applied={appliedIds.has(apply.job.id)} onMarkApplied={markApplied} onClose={() => setApply(null)} />
       )}
     </div>
   )

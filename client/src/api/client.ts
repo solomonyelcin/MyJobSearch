@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import type { Profile, Job, ApiResponse, ApplicationKit, DiscoverResult } from '../types'
+import type { Profile, Job, ApiResponse, ApplicationKit, DiscoverResult, InterviewPrep } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -86,6 +86,12 @@ class JobSearchClient {
   async applyKit(profile: Profile, job: Job): Promise<ApplicationKit> {
     const response = await this.client.post<ApiResponse<ApplicationKit>>('/jobs/apply-kit', { profile, job }, { timeout: 90000 })
     if (!response.data.success) throw new Error(response.data.error || 'Failed to prepare application')
+    return response.data.data!
+  }
+
+  async interviewPrep(profile: Profile, job: Job): Promise<InterviewPrep> {
+    const response = await this.client.post<ApiResponse<InterviewPrep>>('/jobs/prep', { profile, job }, { timeout: 130000 })
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to prepare the interview guide')
     return response.data.data!
   }
 

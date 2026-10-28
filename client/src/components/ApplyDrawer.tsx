@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Download, ExternalLink, Lightbulb, Sparkles, X } from 'lucide-react'
+import { CheckCircle2, Download, ExternalLink, GraduationCap, Lightbulb, Send, Sparkles, X } from 'lucide-react'
 import { apiClient } from '../api/client'
 import { CopyButton, Spinner } from './ui'
+import PrepPanel from './PrepPanel'
 import type { ApplicationKit, Job, Profile } from '../types'
 
 interface ApplyDrawerProps {
   job: Job
   profile: Profile
   applied: boolean
+  initialTab?: 'apply' | 'prep'
   onMarkApplied: (job: Job) => void
   onClose: () => void
 }
 
-export default function ApplyDrawer({ job, profile, applied, onMarkApplied, onClose }: ApplyDrawerProps) {
+export default function ApplyDrawer({ job, profile, applied, initialTab = 'apply', onMarkApplied, onClose }: ApplyDrawerProps) {
+  const [tab, setTab] = useState<'apply' | 'prep'>(initialTab)
   const [kit, setKit] = useState<ApplicationKit | null>(null)
   const [error, setError] = useState('')
   const [letter, setLetter] = useState('')
 
   useEffect(() => {
+    if (tab !== 'apply') return
     let cancelled = false
     setKit(null)
     setError('')
@@ -30,7 +34,7 @@ export default function ApplyDrawer({ job, profile, applied, onMarkApplied, onCl
       })
       .catch(err => !cancelled && setError(err instanceof Error ? err.message : 'Could not prepare the application'))
     return () => { cancelled = true }
-  }, [job, profile])
+  }, [job, profile, tab])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -61,24 +65,34 @@ export default function ApplyDrawer({ job, profile, applied, onMarkApplied, onCl
       <div className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl animate-sheet sm:max-w-3xl sm:rounded-3xl">
         <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary-600"><Sparkles size={13} /> AI application kit</p>
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary-600"><Sparkles size={13} /> {tab === 'apply' ? 'AI application kit' : 'Interview preparation'}</p>
             <h3 className="truncate text-lg">{job.title}</h3>
             <p className="truncate text-sm text-slate-500">{job.company}{job.location ? ` · ${job.location}` : ''}</p>
           </div>
           <button onClick={onClose} className="btn-ghost !p-2" aria-label="Close"><X size={20} /></button>
         </header>
 
+        <div className="flex gap-1 border-b border-slate-100 px-4 sm:px-6" role="tablist">
+          {([['apply', 'Apply kit', Send], ['prep', 'Interview prep', GraduationCap]] as const).map(([id, label, Icon]) => (
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+              className={`-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition ${tab === id ? 'border-primary-600 text-primary-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+              <Icon size={15} /> {label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:px-6">
-          {!kit && !error && (
+          {tab === 'prep' && <PrepPanel job={job} profile={profile} />}
+          {tab === 'apply' && !kit && !error && (
             <div className="space-y-3" aria-busy="true">
               <p className="flex items-center gap-2 text-sm text-slate-500"><Spinner /> Tailoring your application to this job…</p>
               {[80, 100, 60, 90].map((w, i) => <div key={i} className="skeleton h-4" style={{ width: `${w}%` }} />)}
               <div className="skeleton h-40 w-full" />
             </div>
           )}
-          {error && <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700">{error}</div>}
+          {tab === 'apply' && error && <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700">{error}</div>}
 
-          {kit && (
+          {tab === 'apply' && kit && (
             <>
               {kit.generatedBy === 'template' && (
                 <div className="rounded-xl border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">

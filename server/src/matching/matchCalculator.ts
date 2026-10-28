@@ -72,8 +72,11 @@ export function scoreJob(profile: Profile, job: Job, opts: { location?: string }
   let matchScore = Math.round(skillMatch * 0.45 + titleMatch * 0.25 + experienceMatch * 0.2 + locationMatch * 0.1)
   // A job that shares neither skills nor title with the candidate is not a match, whatever the location.
   if (titleMatch < 15 && skillMatch < 35) matchScore = Math.round(matchScore * 0.6)
+  const strongTitle = titleMatch >= 35
+  const fit: Job['fit'] = (strongTitle && matched.length >= 1) || matched.length >= 3 ? 'strong' : strongTitle || matched.length >= 2 ? 'ok' : 'weak'
   return {
     ...job,
+    fit,
     matchScore: Math.max(0, Math.min(100, matchScore)),
     matchBreakdown: { skillMatch, titleMatch, experienceMatch, locationMatch },
     matchedSkills: matched.slice(0, 12),

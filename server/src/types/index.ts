@@ -99,6 +99,9 @@ export interface Job {
   }
   matchedSkills?: string[]
   missingSkills?: string[]
+  /** how well the job fits the resume: weak ones are hidden by default */
+  fit?: 'strong' | 'ok' | 'weak'
+  experienceText?: string
   aiScored?: boolean
   aiReason?: string
   aiPros?: string[]
@@ -162,4 +165,25 @@ export interface ApiResponse<T> {
   success: boolean
   data?: T
   error?: string
+}
+
+export interface PrepQA {
+  question: string
+  answer: string
+  skill?: string
+  level?: 'basic' | 'intermediate' | 'advanced'
+}
+
+export interface InterviewPrep {
+  overview: string
+  strengths: string[]
+  gaps: string[]
+  technical: PrepQA[]
+  scenario: PrepQA[]
+  behavioral: PrepQA[]
+  topics: Array<{ topic: string; why: string; priority: 'high' | 'medium' | 'low'; howToPrepare?: string }>
+  plan: Array<{ day: string; focus: string; tasks: string[] }>
+  questionsToAsk: string[]
+  tips: string[]
+  generatedBy: 'ai' | 'template'
 }

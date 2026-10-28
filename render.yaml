@@ -17,7 +17,7 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_MODEL
-        value: claude-sonnet-4-5
+        sync: false
       # Optional: on-site job listings by country (free key from developer.adzuna.com)
       - key: ADZUNA_APP_ID
         sync: false
