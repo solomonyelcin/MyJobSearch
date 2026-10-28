@@ -5,6 +5,8 @@ import { aiEnabled } from '../ai/anthropic'
 import { rankWithAI } from '../ai/rankJobs'
 import { searchJobsWithAI } from '../ai/webSearchJobs'
 import { DEFAULT_LOCATION, filterByLocation, isRemoteQuery } from './location'
+import { fetchAllCompanyJobs } from './companyJobs'
+import { enrichDescriptions } from './sources/ats'
 
 const GENERIC = /^(senior|junior|lead|principal|staff|associate|sr\.?|jr\.?)\s+/i
 
@@ -57,8 +59,19 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
     tasks.push(settle(`Arbeitnow · ${q}`, () => fetchArbeitnow(q, searchFilters), reports))
     tasks.push(settle(`Adzuna · ${q}`, () => fetchAdzuna(q, searchFilters), reports))
   }
+  // Company career portals (one fetch per company, not per query)
+  let companyStatuses: Array<{ ok: boolean }> = []
+  if (!remoteSearch) {
+    tasks.push(
+      settle('Company career pages', async () => {
+        const { jobs, statuses } = await fetchAllCompanyJobs(location, queries)
+        companyStatuses = statuses
+        return jobs
+      }, reports),
+    )
+  }
   if (!remoteSearch && !adzunaReady) {
-    notices.push(`On-site jobs in ${location} come mainly from Adzuna. Add ADZUNA_APP_ID and ADZUNA_APP_KEY on the server (free at developer.adzuna.com) for many more results.`)
+    notices.push(`Adding free Adzuna keys (ADZUNA_APP_ID, ADZUNA_APP_KEY from developer.adzuna.com) brings in many more on-site jobs in ${location}.`)
   }
   const useAI = Boolean(opts.useAI) && aiEnabled()
   if (useAI) {
@@ -83,6 +96,17 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
   const inPlace = filterByLocation(unique, location, includeRemote)
   let scored: Job[] = calculateMatches(profile, inPlace, { location }).sort((a, b) => b.matchScore - a.matchScore)
 
+  // Company pages list every role (HR, finance...). Fetch full text for the best few, rescore, then drop clear mismatches.
+  if (scored.some(j => j.source === 'company')) {
+    try {
+      const enriched = await enrichDescriptions(scored, 12)
+      scored = calculateMatches(profile, enriched, { location }).sort((a, b) => b.matchScore - a.matchScore)
+    } catch {
+      /* keep the un-enriched scores */
+    }
+    scored = scored.filter(j => j.source !== 'company' || (j.matchScore || 0) >= 30)
+  }
+
   if (useAI && scored.length) {
     try {
       scored = (await rankWithAI(profile, scored, 12)).sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
@@ -101,6 +125,10 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
     merged.set(name, cur)
   }
   // Adzuna without keys is "not configured", not a failure
+  if (companyStatuses.length) {
+    const bad = companyStatuses.filter(c => !c.ok).length
+    if (bad > 0) notices.push(`${bad} of ${companyStatuses.length} company career pages could not be reached (see /api/jobs/companies/health).`)
+  }
   const sources = Array.from(merged.values()).filter(r => !(r.name === 'Adzuna' && r.count === 0 && !r.error))
 
   return {

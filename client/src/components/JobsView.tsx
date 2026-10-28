@@ -21,10 +21,24 @@ interface JobsViewProps {
 const DEFAULT_LOCATION = 'Chennai'
 const LOCATION_KEY = 'mjs.location'
 const REMOTE_KEY = 'mjs.includeRemote'
+const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
+/** Plain links that open the search on the big job boards in the user's own browser. */
+function siteLinks(role: string, place: string): Array<{ name: string; url: string }> {
+  const q = encodeURIComponent(role)
+  const city = encodeURIComponent(place)
+  return [
+    { name: 'Naukri', url: `https://www.naukri.com/${slug(role)}-jobs-in-${slug(place)}` },
+    { name: 'LinkedIn', url: `https://www.linkedin.com/jobs/search/?keywords=${q}&location=${city}` },
+    { name: 'Indeed', url: `https://in.indeed.com/jobs?q=${q}&l=${city}` },
+    { name: 'foundit (Monster)', url: `https://www.foundit.in/srp/results?query=${q}&locations=${city}` },
+  ]
+}
+
 const PLACES = ['Chennai', 'Bengaluru', 'Hyderabad', 'Mumbai', 'Pune', 'Delhi NCR', 'Remote']
 
 const SOURCE_LABEL: Record<string, string> = {
-  remotive: 'Remotive', arbeitnow: 'Arbeitnow', remoteok: 'RemoteOK', jobicy: 'Jobicy', adzuna: 'Adzuna', 'ai-web': 'AI web search', other: 'Web',
+  company: 'Careers page', remotive: 'Remotive', arbeitnow: 'Arbeitnow', remoteok: 'RemoteOK', jobicy: 'Jobicy', adzuna: 'Adzuna', 'ai-web': 'AI web search', other: 'Web',
 }
 
 function JobCard({ job, saved, applied, onToggleSave, onApply }: { job: Job; saved: boolean; applied: boolean; onToggleSave: () => void; onApply: () => void }) {
@@ -233,6 +247,18 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
           <JobCard key={job.id} job={job} saved={savedIds.has(job.id)} applied={appliedIds.has(job.id)} onToggleSave={() => onToggleSave(job)} onApply={() => onApply(job)} />
         ))}
       </div>
+
+      {!jobsOverride && (
+        <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-sm">
+          <p className="mb-2 font-medium text-slate-700">Also search on other job sites</p>
+          <div className="flex flex-wrap gap-2">
+            {siteLinks(query.trim() || profile.headline || profile.experience[0]?.title || 'software engineer', result?.meta.location || location).map(l => (
+              <a key={l.name} href={l.url} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm"><ExternalLink size={13} /> {l.name}</a>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-400">These open in a new tab, using your own browser and login.</p>
+        </div>
+      )}
 
       {result && !jobsOverride && (
         <details className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-sm text-slate-600">

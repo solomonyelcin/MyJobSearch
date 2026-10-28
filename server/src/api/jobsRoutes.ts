@@ -4,6 +4,8 @@ import { buildApplicationKit } from '../ai/applicationKit'
 import { aiEnabled, aiModel } from '../ai/anthropic'
 import { aiBudgetPerHour, takeToken } from '../util/rateLimit'
 import { DEFAULT_LOCATION } from '../jobs/location'
+import { fetchAllCompanyJobs } from '../jobs/companyJobs'
+import { cached } from '../util/cache'
 import type { ApiResponse, ApplicationKit, DiscoverResult, Job, Profile } from '../types'
 
 const router = Router()
@@ -18,6 +20,29 @@ router.get('/ai-status', (_req: Request, res: Response) => {
       defaultLocation: DEFAULT_LOCATION,
     },
   })
+})
+
+/** Which company career feeds respond right now? Use this to prune or fix entries in jobs/companies.ts. */
+router.get('/companies/health', async (req: Request, res: Response) => {
+  try {
+    if (!takeToken(`health:${req.ip}`, 6, 3600_000)) {
+      return res.status(429).json({ success: false, error: 'Too many checks. Try again later.' })
+    }
+    const city = String(req.query.location || DEFAULT_LOCATION)
+    const { statuses } = await cached(`health:${city}`, 10 * 60 * 1000, () => fetchAllCompanyJobs(city, ['software engineer']))
+    res.json({
+      success: true,
+      data: {
+        location: city,
+        working: statuses.filter(s => s.ok).length,
+        failing: statuses.filter(s => !s.ok).length,
+        withJobsInLocation: statuses.filter(s => s.inLocation > 0).length,
+        companies: statuses,
+      },
+    })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'Health check failed' })
+  }
 })
 
 /** Find best-match jobs for a profile across live job boards (and AI web search when configured). */
