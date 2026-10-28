@@ -4,8 +4,9 @@ import { calculateMatches } from '../matching/matchCalculator'
 import { aiEnabled } from '../ai/anthropic'
 import { rankWithAI } from '../ai/rankJobs'
 import { searchJobsWithAI } from '../ai/webSearchJobs'
-import { DEFAULT_LOCATION, filterByLocation, isRemoteQuery } from './location'
+import { DEFAULT_LOCATION, filterByLocation, isRemoteQuery, jobInLocation } from './location'
 import { fetchAllCompanyJobs } from './companyJobs'
+import { fetchJooble, joobleReady } from './sources/jooble'
 import { enrichDescriptions } from './sources/ats'
 
 const GENERIC = /^(senior|junior|lead|principal|staff|associate|sr\.?|jr\.?)\s+/i
@@ -58,6 +59,7 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
     }
     tasks.push(settle(`Arbeitnow · ${q}`, () => fetchArbeitnow(q, searchFilters), reports))
     tasks.push(settle(`Adzuna · ${q}`, () => fetchAdzuna(q, searchFilters), reports))
+    if (joobleReady()) tasks.push(settle(`Jooble · ${q}`, () => fetchJooble(q, searchFilters), reports))
   }
   // Company career portals (one fetch per company, not per query)
   let companyStatuses: CompanyStatus[] = []
@@ -71,14 +73,23 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
       }, reports),
     )
   }
-  if (!remoteSearch && !adzunaReady) {
-    notices.push(`Adding free Adzuna keys (ADZUNA_APP_ID, ADZUNA_APP_KEY from developer.adzuna.com) brings in many more on-site jobs in ${location}.`)
+  const aiOn = aiEnabled()
+  const useAI = Boolean(opts.useAI) && aiOn
+  if (!remoteSearch) {
+    if (!aiOn) notices.push('AI web search is off because the server has no ANTHROPIC_API_KEY. It is the best way to find more jobs in ' + location + '.')
+    else if (!useAI) notices.push('AI web search is not ticked for this search. Tick "AI web search & ranking" and search again for much wider coverage.')
+    if (!adzunaReady && !joobleReady()) notices.push('Optional: a free Jooble key (JOOBLE_API_KEY) or Adzuna keys add more on-site listings.')
   }
-  const useAI = Boolean(opts.useAI) && aiEnabled()
+  let aiErrors: string[] = []
   if (useAI) {
-    tasks.push(settle('AI web search', () => searchJobsWithAI(profile, queries[0] || 'software', location, includeRemote), reports))
-  } else if (!remoteSearch && !adzunaReady) {
-    notices.push('Turning on AI web search (needs ANTHROPIC_API_KEY) also finds postings on company career pages.')
+    tasks.push(
+      settle('AI web search', async () => {
+        const r = await searchJobsWithAI(profile, queries, location, includeRemote)
+        aiErrors = r.errors
+        if (r.jobs.length === 0 && r.errors.length) throw new Error(r.errors[0])
+        return r.jobs
+      }, reports),
+    )
   }
 
   const all = (await Promise.all(tasks)).flat()
@@ -95,7 +106,8 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
 
   // ONLY the chosen location (plus remote when opted in)
   const inPlace = filterByLocation(unique, location, includeRemote)
-  let scored: Job[] = calculateMatches(profile, inPlace, { location }).sort((a, b) => b.matchScore - a.matchScore)
+  const rank = (j: Job) => (j.matchScore || 0) - (j.remote && !jobInLocation(j, location) ? 15 : 0)
+  let scored: Job[] = calculateMatches(profile, inPlace, { location }).sort((a, b) => rank(b) - rank(a))
 
   // Company pages list every role (HR, finance...). Fetch full text for the best few, rescore, then drop clear mismatches.
   if (scored.some(j => j.source === 'company')) {
@@ -110,7 +122,7 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
 
   if (useAI && scored.length) {
     try {
-      scored = (await rankWithAI(profile, scored, 12)).sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+      scored = (await rankWithAI(profile, scored, 15)).sort((a, b) => rank(b) - rank(a))
     } catch (err) {
       reports.push({ name: 'AI ranking', count: 0, error: err instanceof Error ? err.message : 'failed' })
     }
@@ -132,6 +144,7 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
   }
   const inPlaceCompany = inPlace.filter(j => j.source === 'company').length
   if (merged.has('Company career pages')) merged.get('Company career pages')!.count = inPlaceCompany
+  if (aiErrors.length) notices.push(`AI web search had a problem: ${aiErrors[0].slice(0, 220)}`)
   const sources = Array.from(merged.values()).filter(r => !(r.name === 'Adzuna' && r.count === 0 && !r.error))
 
   return {

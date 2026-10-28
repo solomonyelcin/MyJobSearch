@@ -6,7 +6,7 @@ export function aiEnabled(): boolean {
 }
 
 export function aiModel(): string {
-  return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5'
+  return process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5'
 }
 
 export interface AiRequest {

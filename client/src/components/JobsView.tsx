@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bookmark, BookmarkCheck, BrainCircuit, Building2, CheckCircle2, ChevronDown, ExternalLink, MapPin, RefreshCw, Search, Send, Wifi } from 'lucide-react'
+import { Bookmark, BookmarkCheck, BrainCircuit, Building2, CheckCircle2, ChevronDown, ExternalLink, GraduationCap, MapPin, RefreshCw, Search, Send, Wifi } from 'lucide-react'
 import { apiClient } from '../api/client'
 import { loadJson, saveJson } from '../lib/storage'
 import { ScoreRing, Spinner, formatSalary, timeAgo } from './ui'
@@ -12,15 +12,16 @@ interface JobsViewProps {
   savedIds: Set<string>
   appliedIds: Set<string>
   onToggleSave: (job: Job) => void
-  onApply: (job: Job) => void
-  aiAvailable: boolean
+  onApply: (job: Job, tab?: 'apply' | 'prep') => void
+  /** null while the server's AI status is still being fetched */
+  aiAvailable: boolean | null
+  onEditProfile?: () => void
   title?: string
   jobsOverride?: Job[]
 }
 
 const DEFAULT_LOCATION = 'Chennai'
 const LOCATION_KEY = 'mjs.location'
-const REMOTE_KEY = 'mjs.includeRemote'
 const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
 /** Plain links that open the search on the big job boards in the user's own browser. */
@@ -41,7 +42,7 @@ const SOURCE_LABEL: Record<string, string> = {
   company: 'Careers page', remotive: 'Remotive', arbeitnow: 'Arbeitnow', remoteok: 'RemoteOK', jobicy: 'Jobicy', adzuna: 'Adzuna', 'ai-web': 'AI web search', other: 'Web',
 }
 
-function JobCard({ job, saved, applied, onToggleSave, onApply }: { job: Job; saved: boolean; applied: boolean; onToggleSave: () => void; onApply: () => void }) {
+function JobCard({ job, saved, applied, onToggleSave, onApply }: { job: Job; saved: boolean; applied: boolean; onToggleSave: () => void; onApply: (tab?: 'apply' | 'prep') => void }) {
   const [open, setOpen] = useState(false)
   const salary = formatSalary(job)
   const posted = timeAgo(job.postedDate)
@@ -112,9 +113,10 @@ function JobCard({ job, saved, applied, onToggleSave, onApply }: { job: Job; sav
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button className="btn-primary flex-1 sm:flex-none" onClick={onApply}>
+        <button className="btn-primary flex-1 sm:flex-none" onClick={() => onApply('apply')}>
           {applied ? <CheckCircle2 size={16} /> : <Send size={16} />} {applied ? 'Applied · view kit' : 'AI apply'}
         </button>
+        <button className="btn-secondary flex-1 sm:flex-none" onClick={() => onApply('prep')}><GraduationCap size={16} /> Interview prep</button>
         <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn-secondary flex-1 sm:flex-none"><ExternalLink size={16} /> View posting</a>
         <button className="btn-ghost ml-auto" onClick={() => setOpen(o => !o)} aria-expanded={open}>
           Details <ChevronDown size={16} className={`transition ${open ? 'rotate-180' : ''}`} />
@@ -124,18 +126,20 @@ function JobCard({ job, saved, applied, onToggleSave, onApply }: { job: Job; sav
   )
 }
 
-export default function JobsView({ profile, result, onResult, savedIds, appliedIds, onToggleSave, onApply, aiAvailable, title, jobsOverride }: JobsViewProps) {
+export default function JobsView({ profile, result, onResult, savedIds, appliedIds, onToggleSave, onApply, aiAvailable, onEditProfile, title, jobsOverride }: JobsViewProps) {
   const [query, setQuery] = useState('')
   // Chennai unless the user picked something else (remembered between visits)
   const [location, setLocation] = useState(() => loadJson<string>(LOCATION_KEY, DEFAULT_LOCATION) || DEFAULT_LOCATION)
-  const [includeRemote, setIncludeRemote] = useState(() => loadJson<boolean>(REMOTE_KEY, false))
-  const [useAI, setUseAI] = useState(aiAvailable)
+  const [includeRemote, setIncludeRemote] = useState(false)
+  // null = follow the server (AI on when a key is configured); true/false = the user's own choice
+  const [aiChoice, setAiChoice] = useState<boolean | null>(null)
+  const aiReady = aiAvailable === true
+  const useAI = aiReady && (aiChoice ?? true)
+  const [showWeak, setShowWeak] = useState(false)
   const [minScore, setMinScore] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const started = useRef(false)
-
-  useEffect(() => { setUseAI(aiAvailable) }, [aiAvailable])
 
   const search = useCallback(async (override?: { location?: string; includeRemote?: boolean }) => {
     const place = (override?.location ?? location).trim() || DEFAULT_LOCATION
@@ -143,7 +147,6 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
     setLoading(true)
     setError('')
     saveJson(LOCATION_KEY, place)
-    saveJson(REMOTE_KEY, withRemote)
     try {
       const data = await apiClient.discoverJobs({ profile, query: query.trim() || undefined, location: place, includeRemote: withRemote, useAI })
       onResult(data)
@@ -155,13 +158,15 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
   }, [profile, query, location, includeRemote, useAI, onResult])
 
   useEffect(() => {
-    if (jobsOverride || started.current || result) return
+    if (jobsOverride || started.current || result || aiAvailable === null) return
     started.current = true
     void search()
-  }, [jobsOverride, result, search])
+  }, [jobsOverride, result, search, aiAvailable])
 
   const all = jobsOverride ?? result?.jobs ?? []
-  const jobs = all.filter(j => (j.matchScore || 0) >= minScore)
+  const scoreOk = all.filter(j => (j.matchScore || 0) >= minScore)
+  const weakCount = jobsOverride ? 0 : scoreOk.filter(j => j.fit === 'weak').length
+  const jobs = scoreOk.filter(j => jobsOverride || showWeak || j.fit !== 'weak')
   const shownPlace = result?.meta.location || location
 
   return (
@@ -174,6 +179,15 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
           </p>
         )}
       </div>
+
+      {!jobsOverride && profile.skills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+          <span className="font-medium">Matching on</span>
+          {profile.skills.slice(0, 8).map(sk => <span key={sk.name} className="chip">{sk.name}</span>)}
+          {profile.skills.length > 8 && <span>+{profile.skills.length - 8} more</span>}
+          {onEditProfile && <button type="button" onClick={onEditProfile} className="ml-1 font-medium text-primary-600 hover:underline">Edit</button>}
+        </div>
+      )}
 
       {!jobsOverride && (
         <form onSubmit={e => { e.preventDefault(); void search() }} className="card !p-3 sm:!p-4 space-y-3">
@@ -203,8 +217,8 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
             <label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded accent-primary-600" checked={includeRemote} onChange={e => setIncludeRemote(e.target.checked)} /> Also include remote jobs</label>
-            <label className={`inline-flex items-center gap-2 ${aiAvailable ? '' : 'opacity-50'}`} title={aiAvailable ? '' : 'Add ANTHROPIC_API_KEY on the server to enable'}>
-              <input type="checkbox" className="h-4 w-4 rounded accent-primary-600" checked={useAI && aiAvailable} disabled={!aiAvailable} onChange={e => setUseAI(e.target.checked)} />
+            <label className={`inline-flex items-center gap-2 ${aiReady ? '' : 'opacity-50'}`} title={aiReady ? '' : 'Add ANTHROPIC_API_KEY on the server to enable'}>
+              <input type="checkbox" className="h-4 w-4 rounded accent-primary-600" checked={useAI} disabled={!aiReady} onChange={e => setAiChoice(e.target.checked)} />
               <BrainCircuit size={15} className="text-primary-600" /> AI web search &amp; ranking
             </label>
           </div>
@@ -217,6 +231,12 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
         <div className="rounded-2xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-700" role="status">
           <ul className="list-disc space-y-1 pl-5">{result.meta.notices.map(n => <li key={n}>{n}</li>)}</ul>
         </div>
+      )}
+
+      {weakCount > 0 && (
+        <button type="button" onClick={() => setShowWeak(v => !v)} className="text-sm font-medium text-primary-600 hover:underline">
+          {showWeak ? 'Hide weaker matches' : `Show ${weakCount} weaker match${weakCount === 1 ? '' : 'es'} (little overlap with your skills)`}
+        </button>
       )}
 
       {all.length > 0 && (
@@ -234,7 +254,7 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
           {[0, 1, 2].map(i => (
             <div key={i} className="card flex gap-4"><div className="skeleton h-16 w-16 rounded-full" /><div className="flex-1 space-y-2"><div className="skeleton h-5 w-2/3" /><div className="skeleton h-4 w-1/2" /><div className="skeleton h-4 w-3/4" /></div></div>
           ))}
-          <p className="text-center text-sm text-slate-500">Searching job boards and scoring matches…</p>
+          <p className="text-center text-sm text-slate-500">{useAI ? 'AI is reading job boards and company career pages. This can take up to two minutes.' : 'Searching job boards and scoring matches…'}</p>
         </div>
       )}
 
@@ -271,7 +291,7 @@ export default function JobsView({ profile, result, onResult, savedIds, appliedI
 
       <div className="space-y-4">
         {jobs.map(job => (
-          <JobCard key={job.id} job={job} saved={savedIds.has(job.id)} applied={appliedIds.has(job.id)} onToggleSave={() => onToggleSave(job)} onApply={() => onApply(job)} />
+          <JobCard key={job.id} job={job} saved={savedIds.has(job.id)} applied={appliedIds.has(job.id)} onToggleSave={() => onToggleSave(job)} onApply={tab => onApply(job, tab)} />
         ))}
       </div>
 
