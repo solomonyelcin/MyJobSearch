@@ -4,6 +4,7 @@ import { calculateMatches } from '../matching/matchCalculator'
 import { aiEnabled } from '../ai/anthropic'
 import { rankWithAI } from '../ai/rankJobs'
 import { searchJobsWithAI } from '../ai/webSearchJobs'
+import { DEFAULT_LOCATION, filterByLocation, isRemoteQuery } from './location'
 
 const GENERIC = /^(senior|junior|lead|principal|staff|associate|sr\.?|jr\.?)\s+/i
 
@@ -34,20 +35,36 @@ async function settle(name: string, run: () => Promise<Job[]>, reports: SourceRe
 
 export async function discoverJobs(profile: Profile, filters: SearchFilters, opts: { useAI?: boolean } = {}): Promise<DiscoverResult> {
   const started = Date.now()
+  const location = (filters.location ?? '').trim() || DEFAULT_LOCATION
+  const includeRemote = Boolean(filters.includeRemote)
+  const remoteSearch = isRemoteQuery(location)
+  const wantsRemoteBoards = remoteSearch || includeRemote
   const queries = buildQueries(profile, filters.query)
   const reports: SourceReport[] = []
+  const notices: string[] = []
   const tasks: Array<Promise<Job[]>> = []
+  const searchFilters: SearchFilters = { ...filters, location }
+
+  const adzunaReady = Boolean(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY)
 
   for (const q of queries) {
-    tasks.push(settle(`Remotive · ${q}`, () => fetchRemotive(q), reports))
-    tasks.push(settle(`Jobicy · ${q}`, () => fetchJobicy(q.split(' ').slice(-1)[0] || q), reports))
-    tasks.push(settle(`RemoteOK · ${q}`, () => fetchRemoteOk(q), reports))
-    tasks.push(settle(`Arbeitnow · ${q}`, () => fetchArbeitnow(q, filters), reports))
-    tasks.push(settle(`Adzuna · ${q}`, () => fetchAdzuna(q, filters), reports))
+    // Remote-only boards are skipped unless the user wants remote jobs: they would never be in a city.
+    if (wantsRemoteBoards) {
+      tasks.push(settle(`Remotive · ${q}`, () => fetchRemotive(q), reports))
+      tasks.push(settle(`Jobicy · ${q}`, () => fetchJobicy(q.split(' ').slice(-1)[0] || q), reports))
+      tasks.push(settle(`RemoteOK · ${q}`, () => fetchRemoteOk(q), reports))
+    }
+    tasks.push(settle(`Arbeitnow · ${q}`, () => fetchArbeitnow(q, searchFilters), reports))
+    tasks.push(settle(`Adzuna · ${q}`, () => fetchAdzuna(q, searchFilters), reports))
+  }
+  if (!remoteSearch && !adzunaReady) {
+    notices.push(`On-site jobs in ${location} come mainly from Adzuna. Add ADZUNA_APP_ID and ADZUNA_APP_KEY on the server (free at developer.adzuna.com) for many more results.`)
   }
   const useAI = Boolean(opts.useAI) && aiEnabled()
   if (useAI) {
-    tasks.push(settle('AI web search', () => searchJobsWithAI(profile, queries[0] || 'software', filters.location || ''), reports))
+    tasks.push(settle('AI web search', () => searchJobsWithAI(profile, queries[0] || 'software', location, includeRemote), reports))
+  } else if (!remoteSearch && !adzunaReady) {
+    notices.push('Turning on AI web search (needs ANTHROPIC_API_KEY) also finds postings on company career pages.')
   }
 
   const all = (await Promise.all(tasks)).flat()
@@ -62,7 +79,9 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
     return true
   })
 
-  let scored: Job[] = calculateMatches(profile, unique, { wantRemote: filters.remote }).sort((a, b) => b.matchScore - a.matchScore)
+  // ONLY the chosen location (plus remote when opted in)
+  const inPlace = filterByLocation(unique, location, includeRemote)
+  let scored: Job[] = calculateMatches(profile, inPlace, { location }).sort((a, b) => b.matchScore - a.matchScore)
 
   if (useAI && scored.length) {
     try {
@@ -86,6 +105,6 @@ export async function discoverJobs(profile: Profile, filters: SearchFilters, opt
 
   return {
     jobs: scored.slice(0, 60),
-    meta: { queries, sources, total: scored.length, durationMs: Date.now() - started },
+    meta: { queries, sources, total: scored.length, durationMs: Date.now() - started, location, includeRemote, notices },
   }
 }

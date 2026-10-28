@@ -3,6 +3,7 @@ import { discoverJobs } from '../jobs/discover'
 import { buildApplicationKit } from '../ai/applicationKit'
 import { aiEnabled, aiModel } from '../ai/anthropic'
 import { aiBudgetPerHour, takeToken } from '../util/rateLimit'
+import { DEFAULT_LOCATION } from '../jobs/location'
 import type { ApiResponse, ApplicationKit, DiscoverResult, Job, Profile } from '../types'
 
 const router = Router()
@@ -14,6 +15,7 @@ router.get('/ai-status', (_req: Request, res: Response) => {
       ai: aiEnabled(),
       model: aiEnabled() ? aiModel() : null,
       adzuna: Boolean(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY),
+      defaultLocation: DEFAULT_LOCATION,
     },
   })
 })
@@ -21,8 +23,8 @@ router.get('/ai-status', (_req: Request, res: Response) => {
 /** Find best-match jobs for a profile across live job boards (and AI web search when configured). */
 router.post('/discover', async (req: Request, res: Response) => {
   try {
-    const { profile, query, location, remote, useAI } = req.body as {
-      profile?: Profile; query?: string; location?: string; remote?: boolean; useAI?: boolean
+    const { profile, query, location, includeRemote, useAI } = req.body as {
+      profile?: Profile; query?: string; location?: string; includeRemote?: boolean; useAI?: boolean
     }
     if (!profile || !Array.isArray(profile.skills)) {
       return res.status(400).json({ success: false, error: 'A profile is required' })
@@ -30,7 +32,7 @@ router.post('/discover', async (req: Request, res: Response) => {
     let wantAI = Boolean(useAI) && aiEnabled()
     if (wantAI && !takeToken(`discover:${req.ip}`, aiBudgetPerHour(), 3600_000)) wantAI = false
 
-    const data = await discoverJobs(profile, { query, location, remote }, { useAI: wantAI })
+    const data = await discoverJobs(profile, { query, location, includeRemote }, { useAI: wantAI })
     res.json({ success: true, data } as ApiResponse<DiscoverResult>)
   } catch (err) {
     res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'Failed to find jobs' })

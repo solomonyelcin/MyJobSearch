@@ -1,5 +1,6 @@
 import type { Profile, Job } from '../types'
 import { findSkills } from '../skills/vocabulary'
+import { isRemoteQuery, jobInLocation } from '../jobs/location'
 
 export type MatchResult = Job & { matchScore: number }
 
@@ -36,17 +37,15 @@ function requiredYears(text: string): number {
   return max
 }
 
-function locationFit(profile: Profile, job: Job, wantRemote?: boolean): number {
-  if (job.remote && (wantRemote || !profile.location)) return 100
-  if (!profile.location) return 60
-  const city = profile.location.split(',')[0].trim().toLowerCase()
-  const jl = job.location.toLowerCase()
-  if (city && jl.includes(city)) return 100
-  if (job.remote) return 80
-  return 35
+function locationFit(job: Job, location: string | undefined): number {
+  if (!location) return 60
+  if (isRemoteQuery(location)) return job.remote ? 100 : 20
+  if (jobInLocation(job, location)) return 100
+  if (job.remote) return 70
+  return 30
 }
 
-export function scoreJob(profile: Profile, job: Job, opts: { wantRemote?: boolean } = {}): MatchResult {
+export function scoreJob(profile: Profile, job: Job, opts: { location?: string } = {}): MatchResult {
   const mine = new Map(profile.skills.map(s => [s.name.toLowerCase(), s.name]))
   const hard = [...mine.values()]
   const jobText = `${job.title}\n${job.requirements.join('\n')}\n${job.description}\n${(job.tags || []).join(' ')}`
@@ -68,7 +67,7 @@ export function scoreJob(profile: Profile, job: Job, opts: { wantRemote?: boolea
   else if (job.experienceLevel === 'senior') experienceMatch = have >= 5 ? 95 : have >= 3 ? 70 : 40
   else if (job.experienceLevel === 'entry') experienceMatch = have <= 3 ? 100 : 80
 
-  const locationMatch = locationFit(profile, job, opts.wantRemote)
+  const locationMatch = locationFit(job, opts.location)
 
   let matchScore = Math.round(skillMatch * 0.45 + titleMatch * 0.25 + experienceMatch * 0.2 + locationMatch * 0.1)
   // A job that shares neither skills nor title with the candidate is not a match, whatever the location.
@@ -82,6 +81,6 @@ export function scoreJob(profile: Profile, job: Job, opts: { wantRemote?: boolea
   }
 }
 
-export function calculateMatches(profile: Profile, jobs: Job[], opts: { wantRemote?: boolean } = {}): MatchResult[] {
+export function calculateMatches(profile: Profile, jobs: Job[], opts: { location?: string } = {}): MatchResult[] {
   return jobs.map(j => scoreJob(profile, j, opts))
 }
